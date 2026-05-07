@@ -14,40 +14,37 @@ WHERE country_name IS NOT NULL
 ORDER BY country_name;
 
 
--- 2. dim_customer — уникальные клиенты по email
-INSERT INTO dim_customer (first_name, last_name, age, email, postal_code, country_id)
+-- 2. dim_pet — уникальные питомцы по (тип, имя, порода, категория)
+-- Создаётся ДО клиентов, так как dim_customer.pet_id ссылается на dim_pet
+INSERT INTO dim_pet (pet_type, pet_name, pet_breed, pet_category)
+SELECT DISTINCT
+    NULLIF(TRIM(customer_pet_type),  ''),
+    NULLIF(TRIM(customer_pet_name),  ''),
+    NULLIF(TRIM(customer_pet_breed), ''),
+    NULLIF(TRIM(pet_category),       '')
+FROM mock_data
+WHERE NULLIF(TRIM(customer_pet_name), '') IS NOT NULL
+ON CONFLICT (pet_type, pet_name, pet_breed, pet_category) DO NOTHING;
+
+
+-- 3. dim_customer — уникальные клиенты по email, с FK на питомца
+INSERT INTO dim_customer (first_name, last_name, age, email, postal_code, country_id, pet_id)
 SELECT DISTINCT ON (customer_email)
     customer_first_name,
     customer_last_name,
     customer_age,
     customer_email,
     NULLIF(TRIM(customer_postal_code), ''),
-    c.country_id
+    c.country_id,
+    p.pet_id
 FROM mock_data m
 LEFT JOIN dim_country c ON c.country_name = NULLIF(TRIM(m.customer_country), '')
+LEFT JOIN dim_pet p
+    ON p.pet_type     IS NOT DISTINCT FROM NULLIF(TRIM(m.customer_pet_type),  '')
+   AND p.pet_name     IS NOT DISTINCT FROM NULLIF(TRIM(m.customer_pet_name),  '')
+   AND p.pet_breed    IS NOT DISTINCT FROM NULLIF(TRIM(m.customer_pet_breed), '')
+   AND p.pet_category IS NOT DISTINCT FROM NULLIF(TRIM(m.pet_category),       '')
 ORDER BY customer_email;
-
-
--- 3. dim_pet — питомцы, привязанные к клиентам
--- (дочернее измерение схемы снежинка)
-INSERT INTO dim_pet (customer_id, pet_type, pet_name, pet_breed, pet_category)
-SELECT
-    dc.customer_id,
-    NULLIF(TRIM(m.customer_pet_type),  ''),
-    NULLIF(TRIM(m.customer_pet_name),  ''),
-    NULLIF(TRIM(m.customer_pet_breed), ''),
-    NULLIF(TRIM(m.pet_category),       '')
-FROM (
-    SELECT DISTINCT ON (customer_email)
-        customer_email,
-        customer_pet_type,
-        customer_pet_name,
-        customer_pet_breed,
-        pet_category
-    FROM mock_data
-    ORDER BY customer_email
-) m
-JOIN dim_customer dc ON dc.email = m.customer_email;
 
 
 -- 4. dim_seller — уникальные продавцы по email

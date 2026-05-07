@@ -6,7 +6,20 @@ CREATE TABLE dim_country (
 );
 
 
+-- Измерение: Питомцы (создаётся ДО клиентов — клиент ссылается на питомца)
+-- Уникальная запись по комбинации (тип, имя, порода, категория)
+CREATE TABLE dim_pet (
+    pet_id       SERIAL PRIMARY KEY,
+    pet_type     VARCHAR(50),
+    pet_name     VARCHAR(100),
+    pet_breed    VARCHAR(100),
+    pet_category VARCHAR(100),
+    UNIQUE (pet_type, pet_name, pet_breed, pet_category)
+);
+
+
 -- Измерение: Клиенты
+-- pet_id — суб-измерение снежинки: клиент → питомец
 CREATE TABLE dim_customer (
     customer_id SERIAL PRIMARY KEY,
     first_name  VARCHAR(100),
@@ -14,19 +27,8 @@ CREATE TABLE dim_customer (
     age         INTEGER,
     email       VARCHAR(200) UNIQUE,
     postal_code VARCHAR(20),
-    country_id  INTEGER REFERENCES dim_country(country_id)
-);
-
-
--- Измерение: Питомцы (дочернее к dim_customer — нормализация снежинки)
--- Один клиент → один питомец (1:1 в данных)
-CREATE TABLE dim_pet (
-    pet_id       SERIAL PRIMARY KEY,
-    customer_id  INTEGER NOT NULL REFERENCES dim_customer(customer_id),
-    pet_type     VARCHAR(50),
-    pet_name     VARCHAR(100),
-    pet_breed    VARCHAR(100),
-    pet_category VARCHAR(100)
+    country_id  INTEGER REFERENCES dim_country(country_id),
+    pet_id      INTEGER REFERENCES dim_pet(pet_id)
 );
 
 
@@ -114,7 +116,8 @@ CREATE TABLE dim_date (
 
 -- Таблица фактов: Продажи
 -- Центральная таблица схемы снежинка — только числовые меры
--- и внешние ключи к измерениям
+-- и внешние ключи к измерениям.
+-- Питомец доступен через цепочку: fact_sales → dim_customer → dim_pet
 CREATE TABLE fact_sales (
     sale_id          SERIAL PRIMARY KEY,
     date_id          INTEGER NOT NULL REFERENCES dim_date(date_id),
